@@ -8,6 +8,9 @@ import sys
 import os
 
 import numpy as np
+from pyfiglet import Figlet
+from collections import OrderedDict
+
 
 from distutils.version import StrictVersion
 from pandas import compat, DataFrame, concat
@@ -206,8 +209,8 @@ class GbqConnector(object):
         self.reauth = reauth
         self.verbose = verbose
         self.private_key = private_key or\
-            '/home/hdumodel/.google_api_oauth2_credentials/service_accounts/{}.json'\
-            .format(project_id)
+            ('/home/hdumodel/.google_api_oauth2_credentials'
+             '/service_accounts/{}.json').format(project_id)
         self.auth_local_webserver = auth_local_webserver
         self.dialect = dialect
         self.credentials_path = _get_credentials_file()
@@ -217,6 +220,17 @@ class GbqConnector(object):
         # BQ Queries costs $5 per TB. First 1 TB per month is free
         # see here for more: https://cloud.google.com/bigquery/pricing
         self.query_price_for_TB = 5. / 2**40  # USD/TB
+
+        # pyfiglet staff for price output
+        self.__figlets = OrderedDict([
+            (0.1, Figlet(font='straight')),
+            (0.5, Figlet(font='starwars')),
+            (1.0, Figlet(font='blocks')),
+            (2.0, Figlet(font='fraktur')),
+            (5.0, Figlet(font='doh'))])
+
+        for k in self.__figlets:
+            self.__figlets[k].width = 120
 
     def get_credentials(self):
         if self.private_key:
@@ -448,7 +462,7 @@ class GbqConnector(object):
                 "account private key JSON (file path or string contents) "
                 "with at least two keys: 'client_email' and 'private_key'. "
                 "Can be obtained from: https://console.developers.google."
-                "com/permissions/serviceaccounts".format(private_key))
+                "com/permissions/serviceaccounts".format(self.private_key))
 
     def _print(self, msg, end='\n'):
         if self.verbose:
@@ -476,6 +490,17 @@ class GbqConnector(object):
                 return fmt % (num, unit, suffix)
             num /= 1024.0
         return fmt % (num, 'Y', suffix)
+
+    def price_for(self, bytes_num):
+        figlet = None
+        price = self.query_price_for_TB * bytes_num
+
+        for (k, v) in self.__figlets.items():
+            if price > k:
+                figlet = v
+
+        text_price = '${0:.2f}'.format(price)
+        return figlet and '\n' + figlet.renderText(text_price) or text_price
 
     def get_service(self):
         import httplib2
@@ -600,18 +625,17 @@ class GbqConnector(object):
             except HttpError as ex:
                 self.process_http_error(ex)
 
-        if self.verbose:
-            if query_reply['cacheHit']:
-                self._print('Query done.\nCache hit.\n')
-            else:
-                bytes_processed = int(query_reply.get(
-                    'totalBytesProcessed', '0'))
-                self._print('Query done.\nProcessed: {}'.format(
-                    self.sizeof_fmt(bytes_processed)))
-                self._print('Standard price: ${:,.2f} USD\n'.format(
-                    bytes_processed * self.query_price_for_TB))
+        self._print('Query done.')
 
-            self._print('Retrieving results...')
+        if query_reply['cacheHit']:
+            self._print('Cache hit.')
+        else:
+            bytes_processed = int(query_reply.get('totalBytesProcessed', '0'))
+            self._print('Processed: {}\nStandard price (USD): {}'.format(
+                self.sizeof_fmt(bytes_processed),
+                self.price_for(bytes_processed)))
+
+        self._print('Retrieving results...')
 
         total_rows = int(query_reply['totalRows'])
         result_pages = list()

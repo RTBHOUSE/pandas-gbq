@@ -5,3 +5,5 @@ google-auth-oauthlib
 PyCrypto
 python-gflags
 mock
+pyfiglet
+
