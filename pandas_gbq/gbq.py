@@ -205,7 +205,9 @@ class GbqConnector(object):
         self.project_id = project_id
         self.reauth = reauth
         self.verbose = verbose
-        self.private_key = private_key
+        self.private_key = private_key or\
+            '/home/hdumodel/.google_api_oauth2_credentials/service_accounts/{}.json'\
+            .format(project_id)
         self.auth_local_webserver = auth_local_webserver
         self.dialect = dialect
         self.credentials_path = _get_credentials_file()
@@ -442,11 +444,11 @@ class GbqConnector(object):
             return credentials
         except (KeyError, ValueError, TypeError, AttributeError):
             raise InvalidPrivateKeyFormat(
-                "Private key is missing or invalid. It should be service "
+                "Private key '{}' is missing or invalid. It should be service "
                 "account private key JSON (file path or string contents) "
                 "with at least two keys: 'client_email' and 'private_key'. "
                 "Can be obtained from: https://console.developers.google."
-                "com/permissions/serviceaccounts")
+                "com/permissions/serviceaccounts".format(private_key))
 
     def _print(self, msg, end='\n'):
         if self.verbose:
